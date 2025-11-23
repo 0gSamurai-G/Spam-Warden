@@ -1,0 +1,9 @@
+# requirements.txt
+# Core Discord library
+discord.py
+# For the Gemini API calls
+google-genai
+# For HTTP requests (used for Perplexity API)
+requests
+# NEW: PostgreSQL client library
+psycopg2-binary
