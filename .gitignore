@@ -1,9 +1,0 @@
-# .gitignore content:
-# Ignore environment file containing secrets
-.env
-# Ignore local learning log files
-block.txt
-allow.txt
-# Ignore Python cache files
-__pycache__/
-*.pyc
