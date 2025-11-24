@@ -123,9 +123,9 @@ def load_data_from_db():
 # --- 3. CORE LLM CALL FUNCTIONS & LEARNING LOGIC ---
 
 def call_perplexity(api_key, model_name, prompt):
-    # ... (function body remains the same) ...
     url = "https://api.perplexity.ai/chat/completions"
     headers = {
+        # IMPORTANT: Ensure the key is correctly formatted
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
@@ -136,12 +136,19 @@ def call_perplexity(api_key, model_name, prompt):
     }
     try:
         response = requests.post(url, headers=headers, data=json.dumps(data))
-        response.raise_for_status()
+        # This will raise an exception for bad status codes (4xx, 5xx)
+        response.raise_for_status() 
         content = response.json()['choices'][0]['message']['content']
+        print("✅ Perplexity call successful.")
         return content
+    except requests.exceptions.HTTPError as http_err:
+        # Catch 401, 403, 429 errors here
+        print(f"❌ PERPLEXITY HTTP ERROR (Code {http_err.response.status_code}): {http_err.response.text}")
     except Exception as e:
-        pass
-    return None
+        # Catch other errors like JSONDecodeError or network issues
+        print(f"❌ PERPLEXITY GENERAL ERROR: {e}")
+    
+    return None # Returns None on any failure, triggering Gemini fallback
 
 def call_gemini(api_key, model_name, prompt):
     # ... (function body remains the same) ...
