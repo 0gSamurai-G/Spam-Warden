@@ -17,7 +17,7 @@ except Exception:
         pass
 
 # --- 0. DISCORD CONFIGURATION ---
-ALLOWED_SERVERS = {}
+ALLOWED_SERVERS = {1439561356960464979}
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
 # Set intents for the bot (crucial for message content)
 intents = discord.Intents.default()
