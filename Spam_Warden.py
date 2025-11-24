@@ -387,6 +387,7 @@ class ModBotClient(discord.Client):
         print(f'❌ LOCAL_PROFANITY_SET size: {len(LOCAL_PROFANITY_SET)}')
         print(f'⏱️ RATE LIMIT: {MAX_MESSAGES_PER_WINDOW} msgs / {RATE_LIMIT_WINDOW_SECONDS}s')
         print('-------------------------------------------')
+        await bot.change_presence(activity=discord.Game(name="Moderating the Server"))
 
 
     async def on_message(self, message: discord.Message):
