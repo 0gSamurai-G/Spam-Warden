@@ -147,12 +147,11 @@ def call_gemini(api_key, model_name, prompt):
     # ... (function body remains the same) ...
     try:
         client = genai.Client(api_key=api_key)
-        # config = {"max_output_tokens": MAX_OUTPUT_TOKENS} # Configuration can be inline
+        config = {"max_output_tokens": MAX_OUTPUT_TOKENS} # Configuration can be inline
         
         response = client.models.generate_content(
             model=model_name,
             contents=prompt,
-            config={"max_output_tokens": MAX_OUTPUT_TOKENS}
         )
         content = getattr(response, 'text', None)
         return content
