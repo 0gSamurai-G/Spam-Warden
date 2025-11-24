@@ -2,6 +2,7 @@ import os
 import json
 import re
 import requests
+from discord.ext import commands
 import discord
 import time
 import datetime 
@@ -16,7 +17,7 @@ except Exception:
         pass
 
 # --- 0. DISCORD CONFIGURATION ---
-
+ALLOWED_SERVERS = {}
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
 # Set intents for the bot (crucial for message content)
 intents = discord.Intents.default()
@@ -36,6 +37,7 @@ TIMEOUT_DURATION_SECONDS = 120
 USER_MESSAGE_LOG = {} 
 
 # --- 1. CONFIGURATION ---
+bot = commands.Bot(command_prefix='!', intents=intents)
 
 # LLM Keys & Models
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") 
@@ -387,6 +389,16 @@ class ModBotClient(discord.Client):
         print(f'❌ LOCAL_PROFANITY_SET size: {len(LOCAL_PROFANITY_SET)}')
         print(f'⏱️ RATE LIMIT: {MAX_MESSAGES_PER_WINDOW} msgs / {RATE_LIMIT_WINDOW_SECONDS}s')
         print('-------------------------------------------')
+
+        unauthorized_guilds = []
+        for guild in bot.guilds:
+            if guild.id not in ALLOWED_SERVERS:
+                unauthorized_guilds.append(guild.name)
+                await guild.leave()
+            
+        if unauthorized_guilds:
+            print(f"🚫 CLEANUP: Left the following unauthorized guilds on startup: {', '.join(unauthorized_guilds)}")
+
         await bot.change_presence(activity=discord.Game(name="Moderating the Server"))
 
 
@@ -447,6 +459,17 @@ class ModBotClient(discord.Client):
                     await message.channel.send(warning_message, delete_after=10)
                 except discord.errors.Forbidden:
                     print(f"❌ ERROR: Bot does not have 'Manage Messages' permission.")
+
+
+@bot.event
+async def on_guild_join(guild):
+    """3. 🛡️ CHECK ON NEW INVITE"""
+    if guild.id not in ALLOWED_SERVERS:
+        print(f"❌ UNAUTHORIZED JOIN: Leaving Guild '{guild.name}' (ID: {guild.id})")
+        # Optional: Add a polite message here before leaving
+        await guild.leave()
+    else:
+        print(f"✅ ALLOWED JOIN: Staying in Guild '{guild.name}' (ID: {guild.id})")
 
 
 # --- EXECUTION (Updated to load DB first) ---
