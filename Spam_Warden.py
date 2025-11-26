@@ -306,6 +306,56 @@ def check_tier_0_all_words(message_content, allow_set):
 #     return None
 
 
+# def check_tier_1_spam(message_content):
+#     """Tier 1: Checks for basic spam, repetition, and flood patterns (Zero Tokens)."""
+    
+#     if len(message_content) > 1000:
+#         return "T1: Max Length Exceeded (>1000 chars)"
+
+#     # ==========================================================
+#     # 🌟 FIX: Clean message content to allow Mentions and URLs 🌟
+#     # ==========================================================
+    
+#     # 1. Remove Discord Mentions (User, Channel, Role, Everyone/Here)
+#     # Pattern: < followed by @, #, or :, then numbers/letters/symbols, ending with >
+#     # This ensures mentions like <@12345> are stripped out completely.
+#     clean_content = re.sub(r'<[#@!&]?[0-9a-zA-Z:]+>', '', message_content) 
+    
+#     # 2. Remove URLs (common source of non-alpha characters like : / .)
+#     clean_content = re.sub(r'https?:\/\/\S+', '', clean_content)
+    
+#     # 3. Strip leading/trailing whitespace
+#     clean_content = clean_content.strip()
+
+#     # Numeric/Symbol Spam Check (Applied to CLEANED content)
+#     if len(clean_content) >= 10:
+#         alpha_count = sum(c.isalpha() for c in clean_content)
+        
+#         # Check ratio only if meaningful content remains
+#         if len(clean_content) > 0 and alpha_count / len(clean_content) < 0.10:
+#             return "T1: Numeric/Symbol Spam (>90% non-alpha)"
+            
+#     # ==========================================================
+#     # END OF FIX. Remaining checks use the original message_content.
+#     # ==========================================================
+        
+#     # Excessive Character Repetition Check (uses ORIGINAL message_content)
+#     if re.search(r'(.)\1{8,}', message_content, re.IGNORECASE):
+#         return "T1: Excessive Character Repetition"
+    
+#     # Short Message Low Character Diversity Check (uses ORIGINAL message_content)
+#     if 2 <= len(message_content) <= 15: 
+#         if all(c.isalpha() or c.isspace() for c in message_content):
+#             unique_chars = set(c.lower() for c in message_content if c.isalpha())
+            
+#             if len(unique_chars) < len(message_content) * 0.4:
+#                 return "T1: Short Message Low Character Diversity (Likely Gibberish)"
+
+#     return None
+
+
+import re
+
 def check_tier_1_spam(message_content):
     """Tier 1: Checks for basic spam, repetition, and flood patterns (Zero Tokens)."""
     
@@ -339,20 +389,13 @@ def check_tier_1_spam(message_content):
     # END OF FIX. Remaining checks use the original message_content.
     # ==========================================================
         
-    # Excessive Character Repetition Check (uses ORIGINAL message_content)
-    if re.search(r'(.)\1{3,}', message_content, re.IGNORECASE):
+    # Excessive Character Repetition Check (now requires 9+ consecutive chars)
+    if re.search(r'(.)\1{8,}', message_content, re.IGNORECASE):
         return "T1: Excessive Character Repetition"
     
-    # Short Message Low Character Diversity Check (uses ORIGINAL message_content)
-    if 2 <= len(message_content) <= 15: 
-        if all(c.isalpha() or c.isspace() for c in message_content):
-            unique_chars = set(c.lower() for c in message_content if c.isalpha())
-            
-            if len(unique_chars) < len(message_content) * 0.4:
-                return "T1: Short Message Low Character Diversity (Likely Gibberish)"
+    # 🚨 REMOVED: Short Message Low Character Diversity Check (Removed to prevent false positives)
 
     return None
-
 
 def check_tier_2_profanity(message_content, profanity_set):
     """Tier 2: Checks for known vulgar keywords."""
