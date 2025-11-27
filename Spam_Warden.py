@@ -1048,7 +1048,7 @@ class ModBotClient(commands.Bot):
             print(f"🚫 CLEANUP: Left the following unauthorized guilds on startup: {', '.join(unauthorized_guilds)}")
 
         # Use a generic activity status
-        await self.change_presence(activity=discord.Game(name=f"Mode: Per-Guild | !status"))
+        await self.change_presence(activity=discord.Game(name=f"AI Moderation"))
 
     async def on_message(self, message: discord.Message):
         """Called every time a message is sent."""
