@@ -604,7 +604,7 @@ except Exception:
         pass
 
 # --- 0. DISCORD CONFIGURATION ---
-ALLOWED_SERVERS = {1439561356960464979}
+ALLOWED_SERVERS = {1439561356960464979,1442817806344126496}
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
 # Set intents for the bot (crucial for message content)
 intents = discord.Intents.default()
@@ -626,7 +626,7 @@ USER_MESSAGE_LOG = {}
 bot = commands.Bot(command_prefix='!', intents=intents,help_command=None)
 
 # 🌟 STRICTNESS MODE CONFIGURATION 🌟
-CURRENT_STRICTNESS_MODE = "mid" # Default mode
+CURRENT_STRICTNESS_MODE = "low" # Default mode
 
 # LLM Keys & Models
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") 
@@ -635,12 +635,47 @@ GEMINI_MODEL = "gemini-2.5-flash"
 PERPLEXITY_MODEL = "sonar"
 MAX_OUTPUT_TOKENS = 30 
 
-LLM_CLASSIFICATION_PROMPT_TEMPLATE = (
-    "Analyze the following text for toxicity, hate speech, or abuse in any language or a harmful/inappropriate url. "
-    "Return ONLY a single-line JSON object: "
-    "{{\"is_bad\": [true/false], \"bad_word\": \"[The offensive word or phrase, or None]\"}} "
-    "Text to analyze: \"{message}\""
+# -------------------------------------------------------------------
+# GLOBAL STRICTNESS STATE (Default to 'low')
+LLM_STRICTNESS = 'low'
+
+# 🟢 LOW (MILD) PROMPT: Ignores minor insults (The desired mild prompt)
+MILD_PROMPT = (
+    """Analyze the following text for **SEVERE** toxicity, **HATE SPEECH**, graphic content, **serious abuse**, or a harmful/inappropriate url.
+**Ignore minor insults, mild teasing, sarcasm, and conversational disagreements or non-severe terms (e.g., 'slacker', 'idiot' used casually).** Only return 'is_bad': true if the message clearly violates core safety policies.
+Return ONLY a single-line JSON object:
+{{"is_bad": [true/false], "bad_word": "[The offensive word or phrase, or None]"}}
+Text to analyze: "{message}"
+"""
 )
+
+# 🟡 MEDIUM PROMPT: Moderate filtering, catches common toxicity.
+MEDIUM_PROMPT = (
+    """Analyze the following text for toxicity, hate speech, serious abuse, or a harmful/inappropriate url.
+**Treat minor insults (e.g., 'stupid', 'slacker') as harmful if repeated or clearly directed as an attack, but ignore simple playful sarcasm or non-hostile disagreement.** Only return 'is_bad': true if the content is clearly toxic or abusive.
+Return ONLY a single-line JSON object:
+{{"is_bad": [true/false], "bad_word": "[The offensive word or phrase, or None]"}}
+Text to analyze: "{message}"
+"""
+)
+
+# 🔴 HIGH (STRICT) PROMPT: Catches any form of toxicity, including mild insults and harsh language.
+STRICT_PROMPT = (
+    """Analyze the following text for **ANY** toxicity, **ANY** hate speech, or **ANY** abuse in any language or a harmful/inappropriate url.
+**Flag all insults, even mild ones (e.g., 'slacker', 'idiot'), and harsh, non-friendly language.** Return 'is_bad': true if the content is toxic, abusive, or uses vulgarity.
+Return ONLY a single-line JSON object:
+{{"is_bad": [true/false], "bad_word": "[The offensive word or phrase, or None]"}}
+Text to analyze: "{message}"
+"""
+)
+
+# --- MAP THE CURRENT MODE TO THE CORRECT PROMPT ---
+LLM_PROMPT_MAP = {
+    "low": MILD_PROMPT,
+    "mid": MEDIUM_PROMPT,
+    "high": STRICT_PROMPT,
+    "warden": STRICT_PROMPT, # Warden mode uses the strictest prompt
+}
 
 # --- 2. POSTGRES DATABASE CONFIGURATION ---
 PG_HOST = os.environ.get("PGHOST")
@@ -789,8 +824,8 @@ def process_llm_response(message, llm_output):
                             print(f"🚨 LEARNING: Added '{word_to_block}' to blocked_words DB (Mode: {CURRENT_STRICTNESS_MODE}).")
                         except Exception as e:
                             print(f"❌ DB WRITE ERROR: Failed to insert blocked word: {e}")
-            else:
-                print(f"🚫 LEARNING SKIPPED: Blocked word not added to DB (Mode: {CURRENT_STRICTNESS_MODE}).")
+                else:
+                    print(f"🚫 LEARNING SKIPPED: Blocked word not added to DB (Mode: {CURRENT_STRICTNESS_MODE}).")
                         
             return True 
             
@@ -819,8 +854,8 @@ def process_llm_response(message, llm_output):
                             print(f"👍 LEARNING: Added {len(words_to_insert)} unique words to allowed_words DB (Mode: {CURRENT_STRICTNESS_MODE}).")
                     except Exception as e:
                             print(f"❌ DB WRITE ERROR: Failed to insert allowed words: {e}")
-            else:
-                 print(f"💡 LEARNING SKIPPED: Allowed words not added to DB (Mode: {CURRENT_STRICTNESS_MODE}).")
+                else:
+                     print(f"💡 LEARNING SKIPPED: Allowed words not added to DB (Mode: {CURRENT_STRICTNESS_MODE}).")
 
             return False 
 
@@ -939,7 +974,9 @@ def run_moderation_pipeline(message):
     
     print("✔️ Tiers 0-2 Passed. Proceeding to LLM Nuance Check (Token Used)...")
     
-    llm_prompt = LLM_CLASSIFICATION_PROMPT_TEMPLATE.format(message=message_content)
+    # 🌟 KEY FIX: SELECT THE PROMPT BASED ON CURRENT MODE
+    selected_prompt_template = LLM_PROMPT_MAP.get(CURRENT_STRICTNESS_MODE.lower(), MILD_PROMPT)
+    llm_prompt = selected_prompt_template.format(message=message_content)
     llm_response_content = None
 
     llm_response_content = call_perplexity(PERPLEXITY_API_KEY, PERPLEXITY_MODEL, llm_prompt)
