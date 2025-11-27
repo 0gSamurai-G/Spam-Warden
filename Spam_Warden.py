@@ -1301,8 +1301,8 @@ def get_current_mode(guild_id):
 
 # 🟢 LOW (MILD) PROMPT: Ignores minor insults (The desired mild prompt)
 MILD_PROMPT = (
-    """Analyze the following text for **SEVERE** toxicity, **HATE SPEECH**, graphic content, **serious abuse**, or a harmful/inappropriate url.
-**Ignore minor insults, mild teasing, sarcasm, and conversational disagreements or non-severe terms (e.g., 'slacker', 'idiot' used casually).** Only return 'is_bad': true if the message clearly violates core safety policies.
+    """First, **DETECT THE LANGUAGE** of the following text and use that language context for the analysis. Analyze the text for **SEVERE** toxicity, **HATE SPEECH**, graphic content, **serious abuse**, or a harmful/inappropriate url.
+**Ignore minor insults, mild teasing, sarcasm, and conversational disagreements or non-severe terms (e.g., 'slacker', 'idiot' used casually).** Only return 'is_bad': true if the message clearly violates core safety policies **in the detected language.**
 Return ONLY a single-line JSON object:
 {{"is_bad": [true/false], "bad_word": "[The offensive word or phrase, or None]"}}
 Text to analyze: "{message}"
@@ -1311,8 +1311,8 @@ Text to analyze: "{message}"
 
 # 🟡 MEDIUM PROMPT: Moderate filtering, catches common toxicity.
 MEDIUM_PROMPT = (
-    """Analyze the following text for toxicity, hate speech, serious abuse, or a harmful/inappropriate url.
-**Treat minor insults (e.g., 'stupid', 'slacker') as harmful if repeated or clearly directed as an attack, but ignore simple playful sarcasm or non-hostile disagreement.** Only return 'is_bad': true if the content is clearly toxic or abusive.
+    """First, **DETECT THE LANGUAGE** of the following text and use that language context for the analysis. Analyze the text for toxicity, hate speech, serious abuse, or a harmful/inappropriate url.
+**Treat minor insults (e.g., 'stupid', 'slacker') as harmful if repeated or clearly directed as an attack, but ignore simple playful sarcasm or non-hostile disagreement.** Only return 'is_bad': true if the content is clearly toxic or abusive **in the detected language.**
 Return ONLY a single-line JSON object:
 {{"is_bad": [true/false], "bad_word": "[The offensive word or phrase, or None]"}}
 Text to analyze: "{message}"
@@ -1321,8 +1321,8 @@ Text to analyze: "{message}"
 
 # 🔴 HIGH (STRICT) PROMPT: Catches any form of toxicity, including mild insults and harsh language.
 STRICT_PROMPT = (
-    """Analyze the following text for **ANY** toxicity, **ANY** hate speech, or **ANY** abuse in any language or a harmful/inappropriate url.
-**Flag all insults, even mild ones (e.g., 'slacker', 'idiot'), and harsh, non-friendly language.** Return 'is_bad': true if the content is toxic, abusive, or uses vulgarity.
+    """First, **DETECT THE LANGUAGE** of the following text and use that language context for the analysis. Analyze the text for **ANY** toxicity, **ANY** hate speech, or **ANY** abuse in any language or a harmful/inappropriate url.
+**Flag all insults, even mild ones (e.g., 'slacker', 'idiot'), and harsh, non-friendly language.** Return 'is_bad': true if the content is toxic, abusive, or uses vulgarity **in the detected language.**
 Return ONLY a single-line JSON object:
 {{"is_bad": [true/false], "bad_word": "[The offensive word or phrase, or None]"}}
 Text to analyze: "{message}"
