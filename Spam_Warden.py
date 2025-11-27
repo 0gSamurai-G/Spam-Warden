@@ -623,7 +623,7 @@ USER_MESSAGE_LOG = {}
 
 # --- 1. CONFIGURATION ---
 # We keep this for command registration until the class is defined
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix='!', intents=intents,help_command=None)
 
 # 🌟 STRICTNESS MODE CONFIGURATION 🌟
 CURRENT_STRICTNESS_MODE = "mid" # Default mode
