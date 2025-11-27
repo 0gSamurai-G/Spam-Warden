@@ -625,8 +625,9 @@ USER_MESSAGE_LOG = {}
 # We keep this for command registration until the class is defined
 bot = commands.Bot(command_prefix='!', intents=intents,help_command=None)
 
-# 🌟 STRICTNESS MODE CONFIGURATION 🌟
-CURRENT_STRICTNESS_MODE = "low" # Default mode
+# 🌟 FIX: REPLACE GLOBAL STRING WITH GLOBAL DICTIONARY 🌟
+# Stores {guild_id: "low" | "mid" | "high" | "warden"}
+GUILD_STRICTNESS_MODES = {} 
 
 # LLM Keys & Models
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") 
@@ -637,7 +638,14 @@ MAX_OUTPUT_TOKENS = 30
 
 # -------------------------------------------------------------------
 # GLOBAL STRICTNESS STATE (Default to 'low')
-LLM_STRICTNESS = 'low'
+# REMOVED: LLM_STRICTNESS = 'low' (Now handled by per-guild dictionary lookup)
+
+# Utility function to get the current mode for a guild
+def get_current_mode(guild_id):
+    """Retrieves the strictness mode for a specific guild, defaulting to 'low'."""
+    # Use .get() with a default value to ensure we always return a valid mode
+    return GUILD_STRICTNESS_MODES.get(guild_id, "low")
+
 
 # 🟢 LOW (MILD) PROMPT: Ignores minor insults (The desired mild prompt)
 MILD_PROMPT = (
@@ -790,9 +798,8 @@ def call_gemini(api_key, model_name, prompt):
         pass
     return None
 
-def process_llm_response(message, llm_output):
-    # ... (Process LLM function remains the same) ...
-    global CURRENT_STRICTNESS_MODE
+# 🛑 FIX: Added 'current_mode' parameter and removed global usage
+def process_llm_response(message, llm_output, current_mode):
     
     if not llm_output:
         return None
@@ -806,7 +813,8 @@ def process_llm_response(message, llm_output):
         bad_word = data.get('bad_word', 'None')
         
         if is_bad is True:
-            if CURRENT_STRICTNESS_MODE in ["high", "warden"]:
+            # 🛑 FIX: Use the passed 'current_mode'
+            if current_mode in ["high", "warden"]: 
                 if bad_word and bad_word.lower() != 'none':
                     word_to_block = bad_word.lower().strip()
                     if word_to_block and word_to_block not in LOCAL_PROFANITY_SET:
@@ -821,16 +829,19 @@ def process_llm_response(message, llm_output):
                             conn.commit()
                             conn.close()
                             LOCAL_PROFANITY_SET.add(word_to_block) 
-                            print(f"🚨 LEARNING: Added '{word_to_block}' to blocked_words DB (Mode: {CURRENT_STRICTNESS_MODE}).")
+                            # 🛑 FIX: Use the passed 'current_mode' in print
+                            print(f"🚨 LEARNING: Added '{word_to_block}' to blocked_words DB (Mode: {current_mode}).")
                         except Exception as e:
                             print(f"❌ DB WRITE ERROR: Failed to insert blocked word: {e}")
                 else:
-                    print(f"🚫 LEARNING SKIPPED: Blocked word not added to DB (Mode: {CURRENT_STRICTNESS_MODE}).")
+                    # 🛑 FIX: Use the passed 'current_mode' in print
+                    print(f"🚫 LEARNING SKIPPED: Blocked word not added to DB (Mode: {current_mode}).")
                         
             return True 
             
         elif is_bad is False:
-            if CURRENT_STRICTNESS_MODE in ["low", "warden"]:
+            # 🛑 FIX: Use the passed 'current_mode'
+            if current_mode in ["low", "warden"]:
                 words_to_allow = set(re.split(r'\s|\W', message.lower()))
                 words_to_allow.discard('')
                 
@@ -851,11 +862,13 @@ def process_llm_response(message, llm_output):
                             )
                             conn.commit()
                             conn.close()
-                            print(f"👍 LEARNING: Added {len(words_to_insert)} unique words to allowed_words DB (Mode: {CURRENT_STRICTNESS_MODE}).")
+                            # 🛑 FIX: Use the passed 'current_mode' in print
+                            print(f"👍 LEARNING: Added {len(words_to_insert)} unique words to allowed_words DB (Mode: {current_mode}).")
                     except Exception as e:
                             print(f"❌ DB WRITE ERROR: Failed to insert allowed words: {e}")
                 else:
-                     print(f"💡 LEARNING SKIPPED: Allowed words not added to DB (Mode: {CURRENT_STRICTNESS_MODE}).")
+                    # 🛑 FIX: Use the passed 'current_mode' in print
+                    print(f"💡 LEARNING SKIPPED: Allowed words not added to DB (Mode: {current_mode}).")
 
             return False 
 
@@ -937,15 +950,22 @@ def check_tier_2_profanity(message_content, profanity_set):
 # --- 5. THE CORE MODERATION PIPELINE ---
 
 def run_moderation_pipeline(message):
+    if message.guild is None: 
+        # Cannot moderate DMs or messages without a guild context
+        return False
+        
     message_content = message.content
-    global CURRENT_STRICTNESS_MODE
+    # 🛑 FIX: Get the mode for the specific guild
+    current_strictness_mode = get_current_mode(message.guild.id) 
 
     print(f"\n========================================================")
-    print(f"✉️ Analyzing Message: \"{message_content}\" by {message.author.name} (Mode: {CURRENT_STRICTNESS_MODE.upper()})")
+    # 🛑 FIX: Use the specific guild mode in log
+    print(f"✉️ Analyzing Message: \"{message_content}\" by {message.author.name} (Mode: {current_strictness_mode.upper()})")
     print("========================================================")
     
     # Check for Warden Mode access (using is_admin for the specific request)
-    if CURRENT_STRICTNESS_MODE == "warden" and not is_admin(message.author):
+    # 🛑 FIX: Use the specific guild mode for warden check
+    if current_strictness_mode == "warden" and not is_admin(message.author):
         print("🚫 BLOCKED: T0.3 Warden Mode Active.")
         return True
 
@@ -974,8 +994,8 @@ def run_moderation_pipeline(message):
     
     print("✔️ Tiers 0-2 Passed. Proceeding to LLM Nuance Check (Token Used)...")
     
-    # 🌟 KEY FIX: SELECT THE PROMPT BASED ON CURRENT MODE
-    selected_prompt_template = LLM_PROMPT_MAP.get(CURRENT_STRICTNESS_MODE.lower(), MILD_PROMPT)
+    # 🌟 FIX: SELECT THE PROMPT BASED ON THE CURRENT GUILD MODE
+    selected_prompt_template = LLM_PROMPT_MAP.get(current_strictness_mode.lower(), MILD_PROMPT)
     llm_prompt = selected_prompt_template.format(message=message_content)
     llm_response_content = None
 
@@ -983,7 +1003,8 @@ def run_moderation_pipeline(message):
     if not llm_response_content:
         llm_response_content = call_gemini(GEMINI_API_KEY, GEMINI_MODEL, llm_prompt)
     
-    llm_status = process_llm_response(message_content, llm_response_content)
+    # 🛑 FIX: Pass the current_strictness_mode to process_llm_response
+    llm_status = process_llm_response(message_content, llm_response_content, current_strictness_mode)
     
     if llm_status is True:
         return True 
@@ -1003,12 +1024,18 @@ class ModBotClient(commands.Bot):
         self.deletion_lock = asyncio.Lock() 
 
     async def on_ready(self):
+        # 🛑 FIX: Initialize GUILD_STRICTNESS_MODES for allowed guilds
+        for guild in self.guilds:
+            if guild.id in ALLOWED_SERVERS and guild.id not in GUILD_STRICTNESS_MODES:
+                GUILD_STRICTNESS_MODES[guild.id] = "low" # Default mode on startup
+                
         print('-------------------------------------------')
         print(f'🤖 Bot Logged in as {self.user} (ID: {self.user.id})')
         print(f'✅ LOCAL_ALLOW_SET size: {len(LOCAL_ALLOW_SET)}')
         print(f'❌ LOCAL_PROFANITY_SET size: {len(LOCAL_PROFANITY_SET)}')
         print(f'⏱️ RATE LIMIT: {MAX_MESSAGES_PER_WINDOW} msgs / {RATE_LIMIT_WINDOW_SECONDS}s')
-        print(f'⚙️ CURRENT MODE: {CURRENT_STRICTNESS_MODE.upper()}')
+        # 🛑 FIX: Use a generic mode status since it's per-guild now
+        print(f'⚙️ MODE STATUS: Configured for {len(GUILD_STRICTNESS_MODES)} guilds (Default: LOW)')
         print('-------------------------------------------')
 
         unauthorized_guilds = []
@@ -1020,13 +1047,13 @@ class ModBotClient(commands.Bot):
         if unauthorized_guilds:
             print(f"🚫 CLEANUP: Left the following unauthorized guilds on startup: {', '.join(unauthorized_guilds)}")
 
-        # Use self instead of global 'bot' here
-        await self.change_presence(activity=discord.Game(name=f"Mode: {CURRENT_STRICTNESS_MODE.upper()} | !status"))
+        # Use a generic activity status
+        await self.change_presence(activity=discord.Game(name=f"Mode: Per-Guild | !status"))
 
     async def on_message(self, message: discord.Message):
         """Called every time a message is sent."""
         
-        if message.author == self.user or message.author.bot:
+        if message.author == self.user or message.author.bot or message.guild is None:
             return
             
         # The commands.Bot class handles commands by itself if the message is NOT a command.
@@ -1037,6 +1064,10 @@ class ModBotClient(commands.Bot):
 
         # 1. 🛡️ RUN THE TIERED MODERATION PIPELINE
         is_blocked = run_moderation_pipeline(message)
+        
+        # 🛑 FIX: Get the mode for the specific guild to use in the warning message
+        current_mode_for_warning = get_current_mode(message.guild.id)
+
 
         if is_blocked:
             user_log = USER_MESSAGE_LOG.get(message.author.id, [])
@@ -1077,7 +1108,8 @@ class ModBotClient(commands.Bot):
                 # --- ACTION: CONTENT-BASED BLOCK (T1, T2, T3, Warden) ---
                 try:
                     await message.delete() 
-                    warning_message = f"🚫 **{message.author.mention}**, your message was automatically removed due to moderation policies (Content Check). Mode: {CURRENT_STRICTNESS_MODE.upper()}"
+                    # 🛑 FIX: Use the specific guild mode in the warning message
+                    warning_message = f"🚫 **{message.author.mention}**, your message was automatically removed due to moderation policies (Content Check). Mode: {current_mode_for_warning.upper()}"
                     await message.channel.send(warning_message, delete_after=10)
                 except discord.errors.Forbidden:
                     print(f"❌ ERROR: Bot does not have 'Manage Messages' permission.")
@@ -1093,7 +1125,9 @@ async def on_guild_join(guild):
         print(f"❌ UNAUTHORIZED JOIN: Leaving Guild '{guild.name}' (ID: {guild.id})")
         await guild.leave()
     else:
-        print(f"✅ ALLOWED JOIN: Staying in Guild '{guild.name}' (ID: {guild.id})")
+        # 🛑 FIX: Set the default mode for the newly joined guild
+        GUILD_STRICTNESS_MODES[guild.id] = "low"
+        print(f"✅ ALLOWED JOIN: Staying in Guild '{guild.name}' (ID: {guild.id}). Mode set to default 'low'.")
 
 # 🌟 CUSTOM CHECK (Adjusted for Admin/Owner Only) 🌟
 def admin_only_check():
@@ -1103,62 +1137,67 @@ def admin_only_check():
         if not is_admin(ctx.author): 
             await ctx.send("🚫 You must be an **Admin** or **Bot Owner** to change the strictness mode.", delete_after=10)
             return False
+        # Additionally, ensure it's in a guild
+        if ctx.guild is None:
+            await ctx.send("🚫 This command can only be run inside a server.", delete_after=10)
+            return False
         return True
     return commands.check(predicate)
 
 @bot.command(name='low')
 @admin_only_check()
 async def set_low_mode(ctx):
-    # ... (Command logic remains the same) ...
-    global CURRENT_STRICTNESS_MODE
-    CURRENT_STRICTNESS_MODE = "low"
+    # 🛑 FIX: Set the mode for the specific guild
+    GUILD_STRICTNESS_MODES[ctx.guild.id] = "low"
     await ctx.send("🟢 Strictness mode set to **!low** (Mild). Learning **Allowed** words is **ON**. Blocking learning is OFF.")
-    await ctx.bot.change_presence(activity=discord.Game(name=f"Mode: LOW | !status"))
+    # Removed global change_presence, as mode is now per-guild
 
 @bot.command(name='mid')
 @admin_only_check()
 async def set_mid_mode(ctx):
-    # ... (Command logic remains the same) ...
-    global CURRENT_STRICTNESS_MODE
-    CURRENT_STRICTNESS_MODE = "mid"
+    # 🛑 FIX: Set the mode for the specific guild
+    GUILD_STRICTNESS_MODES[ctx.guild.id] = "mid"
     await ctx.send("🟡 Strictness mode set to **!mid** (Medium). **No new words** are learned or saved to the database.")
-    await ctx.bot.change_presence(activity=discord.Game(name=f"Mode: MID | !status"))
+    # Removed global change_presence
 
 @bot.command(name='high')
 @admin_only_check()
 async def set_high_mode(ctx):
-    # ... (Command logic remains the same) ...
-    global CURRENT_STRICTNESS_MODE
-    CURRENT_STRICTNESS_MODE = "high"
+    # 🛑 FIX: Set the mode for the specific guild
+    GUILD_STRICTNESS_MODES[ctx.guild.id] = "high"
     await ctx.send("🔴 Strictness mode set to **!high** (Strict). Learning **Blocked** words is **ON**. Allowing learning is OFF.")
-    await ctx.bot.change_presence(activity=discord.Game(name=f"Mode: HIGH | !status"))
+    # Removed global change_presence
 
 @bot.command(name='warden')
 @admin_only_check()
 async def set_warden_mode(ctx):
-    # ... (Command logic remains the same) ...
-    global CURRENT_STRICTNESS_MODE
-    CURRENT_STRICTNESS_MODE = "warden"
+    # 🛑 FIX: Set the mode for the specific guild
+    GUILD_STRICTNESS_MODES[ctx.guild.id] = "warden"
     await ctx.send("⚫ Strictness mode set to **!warden** (Max Security). **All learning** is **ON**, and **non-admin/non-owner messages** are **instantly blocked**.")
-    await ctx.bot.change_presence(activity=discord.Game(name=f"Mode: WARDEN | !status"))
+    # Removed global change_presence
     
 @bot.command(name='status')
 async def get_status(ctx):
-    # ... (Command logic remains the same) ...
-    global CURRENT_STRICTNESS_MODE
-    embed = discord.Embed(title="🤖 Moderation Bot Status", color=0x00ff00)
-    embed.add_field(name="Current Mode", value=f"**{CURRENT_STRICTNESS_MODE.upper()}**", inline=False)
+    if ctx.guild is None:
+        await ctx.send("🚫 This command can only be run inside a server.")
+        return
+        
+    # 🛑 FIX: Get the mode for the specific guild
+    current_mode = get_current_mode(ctx.guild.id)
     
-    if CURRENT_STRICTNESS_MODE == "low":
+    embed = discord.Embed(title=f"🤖 Moderation Bot Status - {ctx.guild.name}", color=0x00ff00)
+    embed.add_field(name="Current Mode", value=f"**{current_mode.upper()}**", inline=False)
+    
+    if current_mode == "low":
         desc = "Mild Security. Learns **Allowed** words from non-toxic messages (Self-correction)."
-    elif CURRENT_STRICTNESS_MODE == "mid":
+    elif current_mode == "mid":
         desc = "Standard Security. No word learning is performed (Stable Operation)."
-    elif CURRENT_STRICTNESS_MODE == "high":
+    elif current_mode == "high":
         desc = "Strict Security. Learns **Blocked** words from toxic messages (Data Collection)."
-    elif CURRENT_STRICTNESS_MODE == "warden":
+    elif current_mode == "warden":
         desc = "**MAX SECURITY**. Learns **both** allowed and blocked words. **Blocks all non-Admin/Owner messages.**"
     else:
-        desc = "Unknown mode."
+        desc = "Unknown mode (Defaulting to LOW)."
 
     embed.add_field(name="Mode Description", value=desc, inline=False)
     embed.add_field(name="Profanity List Size", value=f"{len(LOCAL_PROFANITY_SET)} words", inline=True)
