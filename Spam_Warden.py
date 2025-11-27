@@ -814,10 +814,10 @@ def process_llm_response(message, llm_output):
                                 "INSERT INTO allowed_words (word) VALUES (%s) ON CONFLICT (word) DO NOTHING;",
                                 words_to_insert
                             )
-                        conn.commit()
+                            conn.commit()
                             conn.close()
                             print(f"👍 LEARNING: Added {len(words_to_insert)} unique words to allowed_words DB (Mode: {CURRENT_STRICTNESS_MODE}).")
-                        except Exception as e:
+                    except Exception as e:
                             print(f"❌ DB WRITE ERROR: Failed to insert allowed words: {e}")
             else:
                  print(f"💡 LEARNING SKIPPED: Allowed words not added to DB (Mode: {CURRENT_STRICTNESS_MODE}).")
