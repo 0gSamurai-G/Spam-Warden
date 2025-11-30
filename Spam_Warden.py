@@ -1247,6 +1247,7 @@ import json
 import re
 import requests
 from discord.ext import commands
+from discord import app_commands
 import discord
 import time
 import datetime 
@@ -1735,6 +1736,13 @@ class ModBotClient(commands.Bot):
         if unauthorized_guilds:
             print(f"🚫 CLEANUP: Left the following unauthorized guilds on startup: {', '.join(unauthorized_guilds)}")
 
+        # Sync application (slash) commands for this bot
+        try:
+            await self.tree.sync()
+            print(f"🔁 Command tree synced for {len(self.tree.get_commands())} commands.")
+        except Exception as e:
+            print(f"⚠️ Failed to sync command tree: {e}")
+
         await self.change_presence(activity=discord.Game(name=f"AI Moderation"))
 
     async def on_message(self, message: discord.Message):
@@ -1743,9 +1751,7 @@ class ModBotClient(commands.Bot):
         if message.author == self.user or message.author.bot or message.guild is None:
             return
             
-        if message.content.startswith(self.command_prefix):
-            await self.process_commands(message)
-            return
+        # No prefix-based command processing here — slash commands are used instead.
 
         # 1. 🛡️ RUN THE TIERED MODERATION PIPELINE
         # 🛑 KEY FIX: AWAIT the asynchronous moderation pipeline call
@@ -1825,41 +1831,60 @@ def admin_only_check():
         return True
     return commands.check(predicate)
 
-@bot.command(name='low')
-@admin_only_check()
-async def set_low_mode(ctx):
-    GUILD_STRICTNESS_MODES[ctx.guild.id] = "low"
-    await ctx.send("🟢 Strictness mode set to **!low** (Mild). Learning **Allowed** words is **ON**. Blocking learning is OFF.")
-
-@bot.command(name='mid')
-@admin_only_check()
-async def set_mid_mode(ctx):
-    GUILD_STRICTNESS_MODES[ctx.guild.id] = "mid"
-    await ctx.send("🟡 Strictness mode set to **!mid** (Medium). **No new words** are learned or saved to the database.")
-
-@bot.command(name='high')
-@admin_only_check()
-async def set_high_mode(ctx):
-    GUILD_STRICTNESS_MODES[ctx.guild.id] = "high"
-    await ctx.send("🔴 Strictness mode set to **!high** (Strict). Learning **Blocked** words is **ON**. Allowing learning is OFF.")
-
-@bot.command(name='warden')
-@admin_only_check()
-async def set_warden_mode(ctx):
-    GUILD_STRICTNESS_MODES[ctx.guild.id] = "warden"
-    await ctx.send("⚫ Strictness mode set to **!warden** (Max Security). **All learning** is **ON**, and **non-admin/non-owner messages** are **instantly blocked**.")
-    
-@bot.command(name='status')
-async def get_status(ctx):
-    if ctx.guild is None:
-        await ctx.send("🚫 This command can only be run inside a server.")
+async def set_low_mode(interaction: discord.Interaction):
+    if interaction.guild is None:
+        await interaction.response.send_message("🚫 This command can only be run inside a server.", ephemeral=True)
         return
-        
-    current_mode = get_current_mode(ctx.guild.id)
-    
-    embed = discord.Embed(title=f"🤖 Moderation Bot Status - {ctx.guild.name}", color=0x00ff00)
+    if not is_admin(interaction.user):
+        await interaction.response.send_message("🚫 You must be an **Admin** or **Bot Owner** to change the strictness mode.", ephemeral=True)
+        return
+    GUILD_STRICTNESS_MODES[interaction.guild.id] = "low"
+    await interaction.response.send_message("🟢 Strictness mode set to **/low** (Mild). Learning **Allowed** words is **ON**. Blocking learning is OFF.")
+
+
+async def set_mid_mode(interaction: discord.Interaction):
+    if interaction.guild is None:
+        await interaction.response.send_message("🚫 This command can only be run inside a server.", ephemeral=True)
+        return
+    if not is_admin(interaction.user):
+        await interaction.response.send_message("🚫 You must be an **Admin** or **Bot Owner** to change the strictness mode.", ephemeral=True)
+        return
+    GUILD_STRICTNESS_MODES[interaction.guild.id] = "mid"
+    await interaction.response.send_message("🟡 Strictness mode set to **/mid** (Medium). **No new words** are learned or saved to the database.")
+
+
+async def set_high_mode(interaction: discord.Interaction):
+    if interaction.guild is None:
+        await interaction.response.send_message("🚫 This command can only be run inside a server.", ephemeral=True)
+        return
+    if not is_admin(interaction.user):
+        await interaction.response.send_message("🚫 You must be an **Admin** or **Bot Owner** to change the strictness mode.", ephemeral=True)
+        return
+    GUILD_STRICTNESS_MODES[interaction.guild.id] = "high"
+    await interaction.response.send_message("🔴 Strictness mode set to **/high** (Strict). Learning **Blocked** words is **ON**. Allowing learning is OFF.")
+
+
+async def set_warden_mode(interaction: discord.Interaction):
+    if interaction.guild is None:
+        await interaction.response.send_message("🚫 This command can only be run inside a server.", ephemeral=True)
+        return
+    if not is_admin(interaction.user):
+        await interaction.response.send_message("🚫 You must be an **Admin** or **Bot Owner** to change the strictness mode.", ephemeral=True)
+        return
+    GUILD_STRICTNESS_MODES[interaction.guild.id] = "warden"
+    await interaction.response.send_message("⚫ Strictness mode set to **/warden** (Max Security). **All learning** is **ON**, and **non-admin/non-owner messages** are **instantly blocked**.")
+
+
+async def get_status(interaction: discord.Interaction):
+    if interaction.guild is None:
+        await interaction.response.send_message("🚫 This command can only be run inside a server.", ephemeral=True)
+        return
+
+    current_mode = get_current_mode(interaction.guild.id)
+
+    embed = discord.Embed(title=f"🤖 Moderation Bot Status - {interaction.guild.name}", color=0x00ff00)
     embed.add_field(name="Current Mode", value=f"**{current_mode.upper()}**", inline=False)
-    
+
     if current_mode == "low":
         desc = "Mild Security. Learns **Allowed** words from non-toxic messages (Self-correction)."
     elif current_mode == "mid":
@@ -1874,7 +1899,7 @@ async def get_status(ctx):
     embed.add_field(name="Mode Description", value=desc, inline=False)
     embed.add_field(name="Profanity List Size", value=f"{len(LOCAL_PROFANITY_SET)} words", inline=True)
     embed.add_field(name="Allow List Size", value=f"{len(LOCAL_ALLOW_SET)} words", inline=True)
-    await ctx.send(embed=embed)
+    await interaction.response.send_message(embed=embed)
 
 
 # --- EXECUTION ---
@@ -1891,9 +1916,21 @@ if __name__ == "__main__":
             if not GEMINI_API_KEY or not PERPLEXITY_API_KEY:
                 print("⚠️ WARNING: One or more LLM API keys are missing. LLM checks will fail.")
             
-            # Transfer commands from the temporary 'bot' object to the final 'client_runner'
-            for command in bot.commands:
-                client_runner.add_command(command)
+            # Register slash commands on the client's CommandTree
+            try:
+                client_runner.tree.add_command(app_commands.Command(name='low', description='Set low strictness mode', callback=set_low_mode))
+                client_runner.tree.add_command(app_commands.Command(name='mid', description='Set medium strictness mode', callback=set_mid_mode))
+                client_runner.tree.add_command(app_commands.Command(name='high', description='Set high strictness mode', callback=set_high_mode))
+                client_runner.tree.add_command(app_commands.Command(name='warden', description='Set warden (max) strictness mode', callback=set_warden_mode))
+                client_runner.tree.add_command(app_commands.Command(name='status', description='Show moderation bot status for the server', callback=get_status))
+            except Exception as e:
+                print(f"⚠️ WARNING: Failed to register slash commands: {e}")
+
+            # Ensure legacy event is attached to the running client
+            try:
+                client_runner.add_listener(on_guild_join)
+            except Exception:
+                pass
 
             client_runner.run(DISCORD_BOT_TOKEN)
             
