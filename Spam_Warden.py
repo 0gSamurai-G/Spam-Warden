@@ -1301,10 +1301,23 @@ def get_current_mode(guild_id):
 
 # 🟢 LOW (MILD) PROMPT: Ignores minor insults (The desired mild prompt)
 MILD_PROMPT = (
-    """First, **DETECT THE LANGUAGE** of the following text and use that language context for the analysis. Analyze the text for **EXTREME SEVERE** toxicity, **EXTREME HATE SPEECH**, graphic content, **EXTREME serious abuse**, or a EXTREME harmful/inappropriate url.
-**Ignore insults, mild teasing, sarcasm, and conversational disagreements or non-severe terms (e.g., 'slacker', 'idiot' used casually).** Only return 'is_bad': true if the message clearly violates core safety policies **in the detected language.**
-Return ONLY a single-line JSON object:
-{{"is_bad": [true/false], "bad_word": "[The offensive word or phrase, or None]"}}
+    """First, DETECT THE LANGUAGE of the given text and analyze for **SEVERE or EXTREME** categories only:
+- Extreme hate speech or discrimination.
+- Explicit calls for violence or harassment.
+- Graphic sexual or violent content.
+- Dangerous URLs or harmful instructions.
+
+Explicitly IGNORE:
+- Regional, ethnic, or linguistic identifiers (e.g., 'Bihari', 'Tamil', 'Punjabi', 'American').
+- Mild insults, teasing, or slang.
+- Sarcasm, jokes, or cultural commentary that is not threatening or violent.
+
+If the text clearly contains SEVERE or EXTREME toxicity, hateful content, or explicit harm, return:
+{"is_bad": true, "bad_word": "[offensive word or phrase]"}
+
+Otherwise, return:
+{"is_bad": false, "bad_word": None}
+
 Text to analyze: "{message}"
 """
 )
