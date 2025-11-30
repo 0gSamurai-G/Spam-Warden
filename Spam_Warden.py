@@ -1306,18 +1306,14 @@ MILD_PROMPT = (
 - Explicit calls for violence or harassment.
 - Graphic sexual or violent content.
 - Dangerous URLs or harmful instructions.
-
 Explicitly IGNORE:
 - Regional, ethnic, or linguistic identifiers (e.g., 'Bihari', 'Tamil', 'Punjabi', 'American').
 - Mild insults, teasing, or slang.
 - Sarcasm, jokes, or cultural commentary that is not threatening or violent.
-
 If the text clearly contains SEVERE or EXTREME toxicity, hateful content, or explicit harm, return:
-{"is_bad": true, "bad_word": "[offensive word or phrase]"}
-
+{{"is_bad": true, "bad_word": "[offensive word or phrase]"}}
 Otherwise, return:
-{"is_bad": false, "bad_word": None}
-
+{{"is_bad": false, "bad_word": None}}
 Text to analyze: "{message}"
 """
 )
